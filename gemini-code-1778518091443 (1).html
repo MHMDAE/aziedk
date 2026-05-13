@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>نظام إدارة الزيارات | المهندس محمد الحسيني</title>
+    <style>
+        :root {
+            --primary: #1e3a5f;
+            --accent: #2563eb;
+            --success: #10b981;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, sans-serif; }
+        body { background: var(--bg); color: #334155; padding-bottom: 50px; }
+
+        .header { background: linear-gradient(135deg, var(--primary), var(--accent)); color: white; padding: 20px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .month-selector { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px; border-radius: 8px; font-weight: bold; cursor: pointer; outline: none; }
+        
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
+        .stat-card { background: rgba(255,255,255,0.15); padding: 10px; border-radius: 12px; text-align: center; backdrop-filter: blur(5px); }
+        .stat-val { display: block; font-size: 1.2rem; font-weight: 800; }
+        .stat-lab { font-size: 0.7rem; opacity: 0.8; }
+
+        .controls { background: white; padding: 15px; margin: 10px; border-radius: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .search-box { width: 100%; padding: 12px; border: 1.5px solid #e2e8f0; border-radius: 10px; margin-bottom: 10px; font-size: 14px; }
+        .filter-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none; }
+        
+        .btn { padding: 8px 15px; border-radius: 8px; border: none; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; white-space: nowrap; }
+        .btn-filter { background: #f1f5f9; color: #64748b; }
+        .btn-filter.active { background: var(--accent); color: white; }
+        .btn-add { background: var(--success); color: white; }
+        .btn-export { background: #6366f1; color: white; }
+
+        .list-container { padding: 0 10px; display: flex; flex-direction: column; gap: 12px; }
+        .visit-card { background: var(--card-bg); border-radius: 15px; padding: 15px; border-right: 5px solid #cbd5e1; box-shadow: 0 2px 5px rgba(0,0,0,0.04); }
+        .visit-card.done { border-right-color: var(--success); background: #f0fdf4; }
+        
+        .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+        .company-name { font-weight: 800; font-size: 15px; color: #1e293b; }
+        
+        .notes-area { width: 100%; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 8px; font-size: 12px; margin-top: 10px; background: #fcfcfc; outline: none; transition: 0.3s; height: 60px; resize: none; }
+        .notes-area:focus { border-color: var(--accent); background: white; }
+
+        .actions { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid #f1f5f9; }
+        .check-circle { width: 32px; height: 32px; border-radius: 50%; border: 2px solid #cbd5e1; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: bold; }
+        .visit-card.done .check-circle { background: var(--success); border-color: var(--success); color: white; }
+
+        .progress-bar { height: 6px; background: rgba(255,255,255,0.2); border-radius: 10px; margin-top: 10px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--success); width: 0%; transition: 0.5s; }
+
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; padding: 20px; }
+        .modal-content { background: white; width: 100%; max-width: 400px; border-radius: 20px; padding: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="top-bar">
+        <h2 style="font-size: 16px;">المهندس محمد الحسيني - إدارة الزيارات</h2>
+        <select class="month-selector" id="monthSelect" onchange="switchMonth()">
+            <option value="1">يناير</option><option value="2">فبراير</option><option value="3">مارس</option>
+            <option value="4">أبريل</option><option value="5" selected>مايو</option><option value="6">يونيو</option>
+            <option value="7">يوليو</option><option value="8">أغسطس</option><option value="9">سبتمبر</option>
+            <option value="10">أكتوبر</option><option value="11">نوفمبر</option><option value="12">ديسمبر</option>
+        </select>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card"><span class="stat-val" id="totalCount">0</span><span class="stat-lab">زيارة</span></div>
+        <div class="stat-card"><span class="stat-val" id="doneCount">0</span><span class="stat-lab">منجزة</span></div>
+        <div class="stat-card"><span class="stat-val" id="percentCount">0%</span><span class="stat-lab">الإنجاز</span></div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progFill"></div></div>
+</div>
+
+<div class="controls">
+    <input type="text" class="search-box" id="searchInp" placeholder="بحث باسم الشركة، الموقع، أو الكود..." oninput="renderList()">
+    <div class="filter-row">
+        <button class="btn btn-filter active" data-f="all" onclick="setF(this)">الكل</button>
+        <button class="btn btn-filter" data-f="pending" onclick="setF(this)">المتبقي</button>
+        <button class="btn btn-filter" data-f="done" onclick="setF(this)">المكتمل</button>
+        <button class="btn btn-add" onclick="toggleModal(true)">+ إضافة</button>
+        <button class="btn btn-export" onclick="exportToCSV()">تصدير Excel</button>
+    </div>
+</div>
+
+<div class="list-container" id="list"></div>
+
+<div class="modal" id="addModal">
+    <div class="modal-content">
+        <h3>إضافة موقع جديد</h3><br>
+        <input id="newComp" type="text" placeholder="اسم الشركة" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ddd;">
+        <input id="newCode" type="text" placeholder="الكود" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ddd;">
+        <input id="newLoc" type="text" placeholder="الموقع" style="width:100%; padding:10px; margin-bottom:20px; border-radius:8px; border:1px solid #ddd;">
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-add" style="flex:1" onclick="addNewVisit()">حفظ</button>
+            <button class="btn" style="flex:1; background:#ddd" onclick="toggleModal(false)">إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // كافة البيانات الـ 69 الأصلية من ملفك
+    const ORIGINAL_DATA = [
+        {id:1,code:"JD1001/1",company:"DHL",location:"المطار"},
+        {id:2,code:"JD1001/2",company:"DHL",location:"السليمانية"},
+        {id:3,code:"JD1001/3",company:"DHL",location:"البلد"},
+        {id:4,code:"JD1001/4",company:"DHL",location:"البساتين"},
+        {id:5,code:"JD1001/5",company:"DHL",location:"ابحر"},
+        {id:6,code:"JD1001/6",company:"DHL",location:"فلسطين"},
+        {id:7,code:"JD1001/7",company:"DHL",location:"صارى"},
+        {id:8,code:"JD1001/8",company:"DHL",location:"جده / الكيا"},
+        {id:9,code:"JD1001/9",company:"DHL",location:"جامعة الملك"},
+        {id:10,code:"JD1001/10",company:"DHL",location:"السنابل"},
+        {id:11,code:"JD1001/11",company:"DHL",location:"الرويس"},
+        {id:12,code:"JD1001/12",company:"DHL",location:"الربوة"},
+        {id:13,code:"JD1001/13",company:"DHL",location:"التحلية"},
+        {id:14,code:"JD1001/14",company:"DHL",location:"البترجى"},
+        {id:15,code:"JD1046/1",company:"اطام الدولية",location:"فندق بست ويسترن"},
+        {id:16,code:"JD1042/1",company:"الاندية الرياضية",location:"بودى ماس"},
+        {id:17,code:"JD1047/1",company:"الحركة المرنة الرياضية",location:"صالة بيلا"},
+        {id:18,code:"JD1049/1",company:"الخطوط السعودية للشحن",location:"مكتب جدة"},
+        {id:19,code:"JD1008/1",company:"الدانوب للمواد الغذائية",location:"الاربعين"},
+        {id:20,code:"JD1008/2",company:"الدانوب للمواد الغذائية",location:"التحلية 1"},
+        {id:21,code:"JD1008/3",company:"الدانوب للمواد الغذائية",location:"التحلية 2"},
+        {id:22,code:"JD1008/4",company:"الدانوب للمواد الغذائية",location:"الخالدية"},
+        {id:23,code:"JD1008/5",company:"الدانوب للمواد الغذائية",location:"السلام مول"},
+        {id:24,code:"JD1008/7",company:"الدانوب للمواد الغذائية",location:"الصيرفي"},
+        {id:25,code:"JD1008/8",company:"الدانوب للمواد الغذائية",location:"ريد سي مول"},
+        {id:26,code:"JD1008/10",company:"الدانوب للمواد الغذائية",location:"الكورنيش"},
+        {id:27,code:"JD1050/1",company:"الذوق الفني للترفية",location:"جراند سيتي"},
+        {id:28,code:"JD1039/2",company:"العمدة المتميز للتجارة",location:"مستودع 1"},
+        {id:29,code:"JD1039/3",company:"العمدة المتميز للتجارة",location:"مستودع 2"},
+        {id:30,code:"JD1057/1",company:"القطب الثاني للنقليات",location:"مكتب مرة"},
+        {id:31,code:"JD11027/1",company:"المجموعة الوطنية للاستزراع المائي",location:"الليث"},
+        {id:32,code:"JD1010/16",company:"المعلم - المكتب",location:"نجود سنتر"},
+        {id:33,code:"JD1010/1",company:"المعلم - روسا كلارا",location:"العرب مول"},
+        {id:34,code:"JD1010/2",company:"المعلم - فاشون افينيو",location:"سوق 7"},
+        {id:35,code:"JD1010/3",company:"المعلم - كات سبيد",location:"ريد سي مول"},
+        {id:36,code:"JD1010/4",company:"المعلم - كاميسيسما",location:"ذا فيلج مول"},
+        {id:37,code:"JD1010/5",company:"المعلم - كوتش",location:"العرب مول"},
+        {id:38,code:"JD1010/6",company:"المعلم - كوتش",location:"ريد سي مول"},
+        {id:39,code:"JD1010/7",company:"المعلم - كوتش",location:"الياسمين هايبر"},
+        {id:40,code:"JD1010/8",company:"المعلم - كوتش",location:"ذا فيلج مول"},
+        {id:41,code:"JD1010/9",company:"المعلم - كولهان",location:"العرب مول"},
+        {id:42,code:"JD1010/10",company:"المعلم - كولهان",location:"جدة بارك"},
+        {id:43,code:"JD1010/11",company:"المعلم - كولهان",location:"ريد سي مول"},
+        {id:44,code:"JD1010/12",company:"المعلم - كولهان",location:"ذا فيلج مول"},
+        {id:45,code:"JD1010/13",company:"المعلم - كولهان",location:"الياسمين هايبر"},
+        {id:46,code:"JD1010/14",company:"المعلم - لولا كساديمونت",location:"ذا فيلج مول"},
+        {id:47,code:"JD1010/15",company:"المعلم - ليجو",location:"ريد سي مول"},
+        {id:48,code:"JD1063/1",company:"ادارة 24 شمال جدة",location:"الأمير سلطان"},
+        {id:49,code:"JD1008/12",company:"بن داود التجارية",location:"الستين"},
+        {id:50,code:"JD1008/13",company:"بن داود التجارية",location:"حراء"},
+        {id:51,code:"JD1008/16",company:"بن داود التجارية",location:"سوق 7"},
+        {id:52,code:"JD1011/4",company:"بنك الامارات دبي الوطني",location:"جدة بارك"},
+        {id:53,code:"JD1017/4",company:"توينا للمأكولات البحرية",location:"الأمير سلطان"},
+        {id:54,code:"JD1017/5",company:"توينا للمأكولات البحرية",location:"المحمدية"},
+        {id:55,code:"JD1071/1",company:"خالد بن احمد محمد علي موصلي",location:"مركز الراجحي"},
+        {id:56,code:"JD1005/8",company:"سارة محمد الراجحي - ماتش",location:"حي الشاطئ"},
+        {id:57,code:"JD1082/1",company:"شركة التطبيقات الدولية التجارية",location:"بحرة"},
+        {id:58,code:"JD1084/1",company:"شركة التوسعة للمقاولات",location:"الماسا بلازا"},
+        {id:59,code:"MA1001/1",company:"DHL",location:"مستودع المدينة"},
+        {id:60,code:"MA1001/2",company:"DHL",location:"الرنانة - هلوي"},
+        {id:61,code:"MA1001/3",company:"DHL",location:"سلطانة"},
+        {id:62,code:"MA1001/4",company:"DHL",location:"ينبع"},
+        {id:63,code:"MA1010/1",company:"المعلم - كوتش",location:"النور مول"},
+        {id:64,code:"MA1010/2",company:"المعلم - كولهان",location:"الراشد مول"},
+        {id:65,code:"MA1010/3",company:"المعلم - ليو جو",location:"الراشد مول"},
+        {id:66,code:"MA1140/1",company:"ورثة ابراهيم العنقري",location:"المدينة المنورة"},
+        {id:67,code:"JD1039/6",company:"العمدة المتميز للتجارة",location:"سوق 7"},
+        {id:68,code:"MD1234/1",company:"بيلسان للتجارة",location:"النور مول"},
+        {id:69,code:"JD108/19",company:"الدانوب للمواد الغذائية",location:"النهضة"}
+    ];
+
+    let currentMonth = "5";
+    let db = JSON.parse(localStorage.getItem('hussaini_full_db')) || {};
+    let filter = 'all';
+
+    function init() {
+        if(!db["5"] || db["5"].length === 0) {
+            db["5"] = ORIGINAL_DATA.map(item => ({...item, done: false, notes: ""}));
+            save();
+        }
+        switchMonth();
+    }
+
+    function save() { localStorage.setItem('hussaini_full_db', JSON.stringify(db)); }
+
+    function switchMonth() {
+        currentMonth = document.getElementById('monthSelect').value;
+        if(!db[currentMonth]) db[currentMonth] = [];
+        renderList();
+    }
+
+    function toggleModal(show) { document.getElementById('addModal').style.display = show ? 'flex' : 'none'; }
+
+    function addNewVisit() {
+        const comp = document.getElementById('newComp').value;
+        if(!comp) return alert("يرجى إدخال اسم الشركة");
+        db[currentMonth].push({
+            id: Date.now(),
+            company: comp,
+            code: document.getElementById('newCode').value || '---',
+            location: document.getElementById('newLoc').value || 'غير محدد',
+            done: false,
+            notes: ''
+        });
+        save();
+        toggleModal(false);
+        renderList();
+    }
+
+    function toggleDone(id) {
+        const item = db[currentMonth].find(x => x.id === id);
+        item.done = !item.done;
+        save();
+        renderList();
+    }
+
+    function updateNote(id, val) {
+        const item = db[currentMonth].find(x => x.id === id);
+        item.notes = val;
+        save();
+    }
+
+    function setF(btn) {
+        document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        filter = btn.dataset.f;
+        renderList();
+    }
+
+    function renderList() {
+        const container = document.getElementById('list');
+        const q = document.getElementById('searchInp').value.toLowerCase();
+        let items = db[currentMonth] || [];
+
+        let filtered = items.filter(v => {
+            const matchesSearch = v.company.toLowerCase().includes(q) || v.location.toLowerCase().includes(q) || v.code.toLowerCase().includes(q);
+            if(filter === 'done') return matchesSearch && v.done;
+            if(filter === 'pending') return matchesSearch && !v.done;
+            return matchesSearch;
+        });
+
+        container.innerHTML = filtered.length ? '' : '<div style="text-align:center; padding:40px; color:#94a3b8;">لا توجد سجلات</div>';
+
+        filtered.forEach(v => {
+            const card = document.createElement('div');
+            card.className = `visit-card ${v.done ? 'done' : ''}`;
+            card.innerHTML = `
+                <div class="card-header">
+                    <div class="company-name">${v.company} <span style="font-size:11px; background:#eff6ff; color:#2563eb; padding:2px 6px; border-radius:4px;">${v.code}</span></div>
+                </div>
+                <div style="font-size:12px; color:#64748b; margin-bottom:8px;">📍 ${v.location}</div>
+                <textarea class="notes-area" placeholder="ملاحظات تقنية..." onchange="updateNote(${v.id}, this.value)">${v.notes || ''}</textarea>
+                <div class="actions">
+                    <span style="font-size:11px; font-weight:bold; color:${v.done ? '#10b981' : '#64748b'}">${v.done ? '✅ منجز' : '⏳ متبقي'}</span>
+                    <div class="check-circle" onclick="toggleDone(${v.id})">${v.done ? '✓' : ''}</div>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+        updateStats(items);
+    }
+
+    function updateStats(items) {
+        const total = items.length;
+        const done = items.filter(v => v.done).length;
+        const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+        document.getElementById('totalCount').innerText = total;
+        document.getElementById('doneCount').innerText = done;
+        document.getElementById('percentCount').innerText = pct + '%';
+        document.getElementById('progFill').style.width = pct + '%';
+    }
+
+    function exportToCSV() {
+        let items = db[currentMonth] || [];
+        let csv = "\ufeffالشركة,الكود,الموقع,الحالة,الملاحظات\n";
+        items.forEach(v => csv += `${v.company},${v.code},${v.location},${v.done?'منجز':'متبقي'},${v.notes.replace(/\n/g, ' ')}\n`);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `تقرير_محمد_الحسيني_شهر_${currentMonth}.csv`;
+        link.click();
+    }
+
+    init();
+</script>
+</body>
+</html>
